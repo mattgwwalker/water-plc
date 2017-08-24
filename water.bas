@@ -1,3 +1,13 @@
+// Water purification plant
+//
+// Uses reverse osmosis to produce very clean water.
+//
+// 2017-08-24:
+// The plant had the option to attach an air compressor.  This code turns power
+// to that air compressor (AC01) on and off.  The air compressor was probably 
+// responsible for regulating its own pressure.  This feature is not necessary
+// if compressed air is available on site.
+
 REG &LT02_percent = &AUX1
 
 REG &LT07_percent = &AUX2
