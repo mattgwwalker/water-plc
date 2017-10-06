@@ -210,13 +210,25 @@ variable to 2, and change PC01cv to 3000.
 Commissioning notes:
 --------------------
 
-2017-08-11:
+2017-10-06:
 
-Reimplemented control algorithm #1.  PP01_SPD is now controlled by
-PC01 and CV01 is not controlled by RC23.
+Changed fault light so that it is illuminated when the conductivity of
+the RO water is not passing the threshold.
 
-2017-08-10:
 
-Started testing of control algorithm #1.
+2017-09-07:
 
-Took the commissioning notes from HOF5 as a basis for these notes.
+Fault light working.
+
+PP02 run command working.  Tested on water, which ran from the small
+tank through to the non return valve before the injection point.  It
+wasn't able to be confirmed that was flowed through the injection
+point, but it probably does.
+
+
+2017-09-01:
+
+All automated valves tested as operational.  PP03 run up to 80% speed.
+Plant can be controlled manually and produced 700l/h of permeate.
+
+

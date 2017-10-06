@@ -2,18 +2,27 @@
 //
 // Uses reverse osmosis to produce very clean water.
 //
+// Caustic soda is pumped (by PP02) into the supply water to reduce the
+// membrane's exposure to chlorine.
+
+//
 // 2017-08-24:
 // The plant had the option to attach an air compressor.  This code turns power
 // to that air compressor (AC01) on and off.  The air compressor was probably 
 // responsible for regulating its own pressure.  This feature is not necessary
 // if compressed air is available on site.
 
+
+// Permeate tank level
 REG &LT02_percent = &AUX1
 
+// Feed tank level
 REG &LT07_percent = &AUX2
 
+// Site tank level
 REG &LT03_percent = &AUX3
 
+// Feed pump (high pressure)
 REG &PP03_SPD = &AUX5
 MEM &D2A_AOP1_ZERO = 0
 MEM &D2A_AOP1_FULL_SCALE = 10000 
@@ -59,8 +68,12 @@ REG &Calc05 = &FLOAT_VARIABLE5
 REG &Calc06 = &FLOAT_VARIABLE6
 
 //IO Mapping
-BIT |LS01_UNCOVERED = |DI_1
-BIT |PS01_MADE = |DI_2
+//BIT |LS01_UNCOVERED = |DI_1 // 2017-09-08: LS01 detected sufficient chemical in the
+                              // chemical tank.  The switch no longer exists.
+			      // See variable 'fakeDigitalInputs' below for disabling code.
+//BIT |PS01_MADE = |DI_2  // 2017-09-07: Pressure switch to check compressed air
+                          // pressure.  Disabling it to see how plant works. 
+                          // See variable 'fakeDigitalInputs' below for disabling code.
 BIT |SW01_SELECTED = |DI_3
 BIT |SW02_SELECTED = |DI_4
 BIT |SW03_SELECTED = |DI_5
@@ -306,13 +319,50 @@ REG &fd100StepMsgTacc = &USER_MEMORY_549
 MEM &CODE_BLANKING=0
 MEM &VIEW_MODE_BLANKING=0
 MEM &SETPOINT_BLANKING=0
+
+     
+     
+// See PS01_MADE above
+REG &fakeDigitalInputs = &USER_MEMORY_550
+BITREG &fakeDigitalInputs = [|PS01_MADE, |LS01_UNCOVERED]
+// PS01_MADE -> 0:sufficient air pressure, 1:insufficient
+// LS01_UNCOVERED -> 0:sufficient chemical level, 1:insufficient 
+MEM &fakeDigitalInputs = 0
+  
+
+// *****************************************************************************
+// *
+// *                     Reset Macro
+// *
+// *****************************************************************************
+
+// This macro is called when the power is turned on to the controller
   
 
 RESET_MACRO:
  &fd100StepNumber = 0
  |AFI = OFF
  &T0acc = 0
+ 
+ // Switch all valves to auto
+ &SV02cmd = 1
+ &SV03cmd = 1
+ &SV04cmd = 1
+ &SV05cmd = 1
+ &SV06cmd = 1
+ &SV08cmd = 1 
 END
+
+
+
+// *****************************************************************************
+// *
+// *                     Main Macro
+// *
+// *****************************************************************************
+
+// This macro is called repeatedly while the controller is running
+
 
 MAIN_MACRO:
 
@@ -346,7 +396,12 @@ MAIN_MACRO:
   &OP_MODE = 0 //OFF
  ENDIF     
   
- //FD100 Production
+  
+ // ****************************************************************************
+ //
+ //                      Main control sequence: FD100
+ //
+ // ****************************************************************************
   
  &Temp1 = &fd100StepNumber
  SELECT &fd100StepNumber
@@ -424,6 +479,7 @@ MAIN_MACRO:
     &Temp1 = 0
    ENDIF
    IF (|LS01_UNCOVERED = OFF) THEN
+    // LS01 indicates there is sufficient level in the chemical tank
     &Temp1 = 3
    ENDIF
    
@@ -446,9 +502,11 @@ MAIN_MACRO:
     &Temp1 = 0
    ENDIF
    IF (|LS01_UNCOVERED = ON) THEN
+    // There's insufficient chemical in the tank 
     &Temp1 = 2
    ENDIF
    IF (|PS01_MADE = OFF) THEN
+    // Sufficient air pressure detected, move on to filling the feed tank
     &Temp1 = 4
    ENDIF
 
@@ -518,7 +576,7 @@ MAIN_MACRO:
    |SV05autoOut = ON
    |SV06autoOut = OFF
    |SV08autoOut = OFF
-   |IL01_ON = OFF
+   //|IL01_ON = OFF
    
    SELECT &OP_MODE
     CASE 15: //CIP No Fill
@@ -579,7 +637,16 @@ MAIN_MACRO:
      ENDIF
     CASE 15: //CIP No Fill          
     DEFAULT: 
-   ENDSEL      
+   ENDSEL
+   
+   // Check that T0 timer is non-zero, otherwise we have a conductivity issue       
+   IF (&T0acc = 0) THEN
+    |IL01_ON = ON // Warn that conductivity isn't acceptable
+   ELSE
+    |IL01_ON = OFF
+   ENDIF
+   
+
 
   CASE 6: //Fill RO Tank
    |AC01autoOut = ON
@@ -758,8 +825,20 @@ MAIN_MACRO:
  ENDIF 
  
  
- //FD101 Feed Tank Level
-  
+
+ // ****************************************************************************
+ //
+ //                      Feed tank control sequence: FD101
+ //
+ // ****************************************************************************  
+
+ // This control sequence is responsible for checking the tank levels and
+ // signalling to FD102 when to fill the tank.
+ //
+ // It is signaled by FD100 using the variable |FD100_Fill.  When that bit is
+ // set, this control sequence signals FD102 using the variables
+ // |FD101_Fill and |FD101_FillOk.
+
  &Temp1 = &fd101StepNumber
  SELECT &fd101StepNumber
   CASE 0: //Reset
@@ -819,11 +898,23 @@ MAIN_MACRO:
   &fd101StepNumber = &Temp1
  ENDIF
  
-  //FD102 Feed Tank Fill
+
+ // ****************************************************************************
+ //
+ //                      Feed tank fill control sequence: FD102
+ //
+ // ****************************************************************************
+
+ // Controls the inflow of water and the pumping of caustic soda with PP02. 
+ // Fills tank with water up to a minimum level; then the tank is filled with
+ // water plus caustic.
+ //
+ // The speed of pump PP02 is set on the unit itself.  As at 2017-09-07 it was
+ // set at 15ml/h (which assumes the inlet water is at 1000L/hour).
   
  &Temp1 = &fd102StepNumber
  SELECT &fd102StepNumber
-  CASE 0: //Reset
+  CASE 0: // Reset
    |SV02autoOut = OFF
    |PP02autoOut = OFF
       
@@ -832,7 +923,7 @@ MAIN_MACRO:
     &Temp1 = 1
    ENDIF
    
-  CASE 1: //Fill Min Level
+  CASE 1: // Fill Min Level
    |SV02autoOut = ON
    |PP02autoOut = OFF
       
@@ -844,7 +935,7 @@ MAIN_MACRO:
     &Temp1 = 2
    ENDIF
    
-  CASE 2: //Record Level
+  CASE 2: // Record Level
    |SV02autoOut = ON
    |PP02autoOut = OFF
    &LT07v1 = &LT07_percent 
@@ -852,7 +943,7 @@ MAIN_MACRO:
    //Transistion Conditions
    &Temp1 = 3
    
-  CASE 3: //Fill Feed Tank - No Chemical
+  CASE 3: // Fill Feed Tank - No Chemical
    |SV02autoOut = ON
    |PP02autoOut = OFF
       
@@ -864,7 +955,7 @@ MAIN_MACRO:
     &Temp1 = 4
    ENDIF
    
-  CASE 4: //Fill Feed Tank - Chemical
+  CASE 4: // Fill Feed Tank - Chemical
    |SV02autoOut = ON
    |PP02autoOut = ON
       
@@ -882,7 +973,13 @@ MAIN_MACRO:
   &fd102StepNumber = &Temp1
  ENDIF 
  
- //Valve and Motor Logic
+// *****************************************************************************
+//
+// Valve and Motor logic
+//
+// ***************************************************************************** 
+
+// Loop through the automatic valves.
  FOR &Temp1 = 1 TO 9 STEP 1
   //Get Values  
   &XXstatus = &XXstatus[&Temp1*8]
