@@ -137,10 +137,17 @@ MEM &LT03sp03 = 1000 //10.00%
 REG &LT03sp04 = &USER_MEMORY_115
 MEM &LT03sp04 = 3000 //30.00%
 
+// "Run 1" speed
+// When running on just one (rather than the normal two) membranes, set this to
+// around 60%
 REG &PP03sp01 = &USER_MEMORY_116
 MEM &PP03sp01 = 10000 //100.00%
+
+// "Run 2" and "Run 4" speed
 REG &PP03sp02 = &USER_MEMORY_117
 MEM &PP03sp02 = 10000 //100.00%
+
+// "Run 3" speed
 REG &PP03sp03 = &USER_MEMORY_118
 MEM &PP03sp03 = 8000 //80.00%
 
@@ -576,7 +583,7 @@ MAIN_MACRO:
    |SV05autoOut = ON
    |SV06autoOut = OFF
    |SV08autoOut = OFF
-   //|IL01_ON = OFF
+   //|IL01_ON = OFF // Warning light is turned on if conductivity test fails
    
    SELECT &OP_MODE
     CASE 15: //CIP No Fill
@@ -604,8 +611,10 @@ MAIN_MACRO:
       IF (&T0acc > &CS04sp02) THEN
        &Temp1 = 6
       ENDIF
+      |IL01_ON = OFF // Conductivity is acceptable; ensure warning light is off
      ELSE
       &T0acc = 0
+      |IL01_ON = ON // Warn that conductivity isn't acceptable
      ENDIF     
     CASE 2: //Product High Level
      IF (|FD101_FillOk = OFF) THEN
@@ -616,8 +625,10 @@ MAIN_MACRO:
       IF (&T0acc > &CS04sp02) THEN
        &Temp1 = 6
       ENDIF
+      |IL01_ON = OFF // Conductivity is acceptable; ensure warning light is off
      ELSE
       &T0acc = 0
+      |IL01_ON = ON // Warn that conductivity isn't acceptable
      ENDIF          
     CASE 3: //Product Low Level
      IF (|FD101_FillOk = OFF) THEN
@@ -628,8 +639,10 @@ MAIN_MACRO:
       IF (&T0acc > &CS04sp02) THEN
        &Temp1 = 6
       ENDIF
+      |IL01_ON = OFF // Conductivity is acceptable; ensure warning light is off
      ELSE
       &T0acc = 0
+      |IL01_ON = ON // Warn that conductivity isn't acceptable
      ENDIF
     CASE 14: //CIP Fill
      IF (|FD101_FillOk = OFF) THEN
@@ -637,15 +650,7 @@ MAIN_MACRO:
      ENDIF
     CASE 15: //CIP No Fill          
     DEFAULT: 
-   ENDSEL
-   
-   // Check that T0 timer is non-zero, otherwise we have a conductivity issue       
-   IF (&T0acc = 0) THEN
-    |IL01_ON = ON // Warn that conductivity isn't acceptable
-   ELSE
-    |IL01_ON = OFF
-   ENDIF
-   
+   ENDSEL   
 
 
   CASE 6: //Fill RO Tank

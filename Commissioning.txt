@@ -210,6 +210,13 @@ variable to 2, and change PC01cv to 3000.
 Commissioning notes:
 --------------------
 
+2017-10-27:
+
+Ran plant on bore water.  Raw water measured ~185 us/cm.  RO water
+measured ~6 us/cm.  Produced around 800--900 L/hour
+of permeate at 15 bar.
+
+
 2017-10-06:
 
 Changed fault light so that it is illuminated when the conductivity of
@@ -222,7 +229,7 @@ Fault light working.
 
 PP02 run command working.  Tested on water, which ran from the small
 tank through to the non return valve before the injection point.  It
-wasn't able to be confirmed that was flowed through the injection
+wasn't able to be confirmed that water flowed through the injection
 point, but it probably does.
 
 
